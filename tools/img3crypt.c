@@ -22,6 +22,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+
+#include <libimg3-1.0/libimg3.h>
 
 #define IMG3_MODE_DECRYPT 1
 #define IMG3_MODE_ENCRYPT 2
@@ -77,11 +80,12 @@ int main(int argc, char* argv[]) {
 			break;
 
 		case 't':
-			img3_template = arg;
+			img3_template = optarg;
 			break;
 
 		case 'o':
-			img3_output = arg;
+			img3_output = optarg;
+			break;
 
 		default:
 			fprintf(stderr, "Unknown argument\n");

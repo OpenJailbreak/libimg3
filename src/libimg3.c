@@ -25,7 +25,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <img3-1.0/libimg3.h>
+#include <libimg3-1.0/libimg3.h>
 #include <libcrippy-1.0/libcrippy.h>
 
 
@@ -217,7 +217,7 @@ img3_error_t img3_encrypt(img3_file_t* image, uint8_t* iv, uint8_t* key) {
 	return IMG3_E_SUCCESS;
 }
 
-img3_element_t* img3_parse_element(char* data) {
+img3_element_t* img3_element_load(uint8_t* data) {
 	img3_element_header_t* element_header = (img3_element_header_t*) data;
 	img3_element_t* element = (img3_element_t*) malloc(sizeof(img3_element_t));
 	if (element == NULL) {
@@ -255,7 +255,7 @@ void img3_free(img3_file_t* image) {
 	}
 }
 
-void img3_free_element(img3_element_t* element) {
+void img3_element_free(img3_element_t* element) {
 	if (element != NULL) {
 		if (element->data != NULL) {
 			free(element->data);
@@ -266,7 +266,7 @@ void img3_free_element(img3_element_t* element) {
 	}
 }
 
-img3_error_t img3_replace_signature(img3_file_t* image, char* signature) {
+img3_error_t img3_replace_signature(img3_file_t* image, uint8_t* signature) {
 	int i, oldidx;
 	int offset = 0;
 	img3_element_t* ecid = img3_parse_element(&signature[offset]);
@@ -375,7 +375,7 @@ img3_error_t img3_replace_signature(img3_file_t* image, char* signature) {
 	return IMG3_E_SUCCESS;
 }
 
-img3_error_t img3_serialize(img3_file_t* image, char** pdata, int* psize) {
+img3_error_t img3_serialize(img3_file_t* image, uint8_t** pdata, size_t* psize) {
 	int i;
 	int offset = 0;
 	int size = sizeof(img3_header_t);
