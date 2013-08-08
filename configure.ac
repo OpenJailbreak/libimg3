@@ -25,9 +25,5 @@ AC_PROG_LIBTOOL
 PKG_CHECK_MODULES(libcrypto, libcrypto >= 1.0)
 PKG_CHECK_MODULES(libcrippy, libcrippy-1.0 >= 1.0)
 
-AC_CONFIG_FILES(Makefile
-                tools/Makefile
-                src/Makefile
-                include/Makefile
-                libimg3-1.0.pc)
+AC_CONFIG_FILES(Makefile tools/Makefile src/Makefile include/Makefile libimg3-1.0.pc)
 AC_OUTPUT
