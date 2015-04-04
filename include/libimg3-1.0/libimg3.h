@@ -74,6 +74,13 @@ typedef struct {
 } img3_element_t;
 
 typedef struct {
+    uint32_t state;
+    uint32_t type;
+    uint8_t iv[16];
+    uint8_t key[32];
+} img3_kbag_element_t;
+
+typedef struct {
 	uint8_t* data;
 	uint32_t size;
 	uint32_t num_elements;

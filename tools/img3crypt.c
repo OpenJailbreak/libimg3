@@ -45,6 +45,8 @@ void print_usage() {
 	printf("\t-e <input>\tEncrypt file given\n");
 	printf("\t-t <template>\tTemplate to encrypt file with\n");
 	printf("\t-o <output>\tFile to write the output to\n");
+	printf("\t-k <iv>\tAES Key to encrypt or decrypt with\n");
+	printf("\t-i <iv>\tAES IV to encrypt or decrypt with\n");
 	exit(1);
 }
 
@@ -53,11 +55,14 @@ int main(int argc, char* argv[]) {
 	int opt = 0;
 	int mode = 0;
 	int action = 0;
+	char* iv = NULL;
+	char* key = NULL;
 	char* argument = NULL;
 	img3_error_t error = 0;
+
 	if (argc == 1)
 		print_usage();
-	while ((opt = getopt(argc, argv, "vqhd::e::t::o::")) > 0) {
+	while ((opt = getopt(argc, argv, "vqhd::e::t::o::i::k::")) > 0) {
 		switch (opt) {
 		case 'v':
 			img3_verbose += 1;
@@ -72,11 +77,21 @@ int main(int argc, char* argv[]) {
 			break;
 
 		case 'd':
+			if(mode != 0) {
+				error("Unable to use both -d and -e flags at once\n");
+				return -1;
+			}
 			mode = IMG3_MODE_DECRYPT;
+			img3_input = optarg;
 			break;
 
 		case 'e':
+			if(mode != 0) {
+				error("Unable to use both -d and -e flags at once\n");
+				return -1;
+			}
 			mode = IMG3_MODE_ENCRYPT;
+			img3_input = optarg;
 			break;
 
 		case 't':
@@ -87,11 +102,33 @@ int main(int argc, char* argv[]) {
 			img3_output = optarg;
 			break;
 
+		case 'i':
+			iv = optarg;
+			break;
+
+		case 'k':
+			key = optarg;
+			break;
+
 		default:
 			fprintf(stderr, "Unknown argument\n");
 			return -1;
 		}
 	}
+
+	// TODO: Sanity check arguments being passed
+	if(img3_input == NULL || img3_output == NULL) {
+		error("Please specify encrypt or decrypt\n");
+		return -1;
+	}
+	debug("Opening Img3 file %s\n", img3_input);
+	img3_file_t* image = img3_open(img3_input);
+	if(image) {
+
+		debug("Closing Img3 file\n")
+		img3_free(image);
+	}
+
 
 	return 0;
 }

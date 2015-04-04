@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <openssl/aes.h>
 
 #include <libimg3-1.0/libimg3.h>
 #include <libcrippy-1.0/libcrippy.h>
@@ -208,8 +209,55 @@ img3_file_t* img3_load(uint8_t* data, size_t size) {
 	return image;
 }
 
+img3_element_t* img3_get_element(img3_file_t* image, img3_element_type_t type) {
+	int i = 0;
+	img3_element_t* element = NULL;
+	for(i = 0; i < image->num_elements; i++) {
+		element = image->elements[i];
+		if(element) {
+			if(element->type == type) {
+				return element;
+			}
+		} else break;
+	}
+	return NULL;
+}
 
+img3_element_t* img3_next_element(img3_file_t* image, img3_element_t* element) {
+	int i = 0;
+	img3_element_t* next_element = NULL;
+	for(i = 0; i < image->num_elements; i++) {
+		if(image->elements[i] == element) {
+			next_element = image->elements[i+1];
+			return next_element;
+		}
+	}
+	return NULL;
+}
+void hexdump(uint8_t *hex, int size) {
+    int i = 0;
+    for (; i < size; i++)
+        printf("%02x", hex[i]);
+    printf("\n");
+}
 img3_error_t img3_decrypt(img3_file_t* image, uint8_t* iv, uint8_t* key) {
+	AES_KEY aes_key;
+	img3_element_t* data = NULL;
+	img3_element_t* element = NULL;
+	img3_kbag_element_t kbag = NULL;
+
+	uint8_t outbuf[32];
+	memset(outbuf, '\0', sizeof(outbuf));
+
+	data = img3_get_element(image, kDataElement);
+	element = img3_get_element(image, kKbagElement);
+	if(element && element->size == sizeof(img3_kbag_element_t)) {
+		kbag = (img3_kbag_element_t*) element->data;
+		AES_set_decrypt_key(key, kbag->type, &aes_key);
+		AES_set_encrypt_key(key, kbag->type, &aes_key);
+		AES_cbc_encrypt(data->data, data->data, (data->header->data_size / 16) * 16, &aes_key, iv, AES_DECRYPT);
+		hexdump(data->data, data->size);
+	}
 	return IMG3_E_SUCCESS;
 }
 
