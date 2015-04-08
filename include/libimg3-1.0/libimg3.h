@@ -81,8 +81,13 @@ typedef struct {
 } img3_kbag_element_t;
 
 typedef struct {
+	uint8_t* iv;
+	uint8_t* key;
+	uint8_t* raw;
 	uint8_t* data;
+	uint32_t bits;
 	uint32_t size;
+	uint32_t decrypted;
 	uint32_t num_elements;
 	uint32_t idx_ecid_element;
 	uint32_t idx_shsh_element;
@@ -103,8 +108,9 @@ img3_file_t* img3_load(uint8_t* data, size_t size);
 void img3_debug(img3_file_t* image);
 void img3_free(img3_file_t* image);
 
-img3_error_t img3_decrypt(img3_file_t* image, uint8_t* iv, uint8_t* key);
-img3_error_t img3_encrypt(img3_file_t* image, uint8_t* iv, uint8_t* key);
+img3_error_t img3_decrypt(img3_file_t* image);
+img3_error_t img3_encrypt(img3_file_t* image);
+img3_error_t img3_set_key(img3_file_t* image, const char* key, const char* iv);
 
 img3_element_t* img3_element_load(uint8_t* data);
 void img3_element_free(img3_element_t* element);

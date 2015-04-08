@@ -26,6 +26,8 @@
 #include <string.h>
 #include <openssl/aes.h>
 
+#define _DEBUG
+
 #include <libimg3-1.0/libimg3.h>
 #include <libcrippy-1.0/libcrippy.h>
 
@@ -70,12 +72,15 @@ img3_file_t* img3_load(uint8_t* data, size_t size) {
 	memcpy(image->header, data, sizeof(img3_header_t));
 	data_offset += sizeof(img3_header_t);
 
+	// TODO: Fix this so it can accept more elements, I'm lazy...
+	image->elements = (img3_element_t**) malloc(sizeof(img3_element_t*) * 0x20);
+
 	img3_element_header_t* current = NULL;
 	while (data_offset < size) {
 		current = (img3_element_header_t*) &data[data_offset];
 		switch (current->signature) {
 		case kTypeElement:
-			element = img3_parse_element(&data[data_offset]);
+			element = img3_element_load(&data[data_offset]);
 			if (element == NULL) {
 				error("ERROR: Unable to parse TYPE element\n");
 				img3_free(image);
@@ -86,7 +91,7 @@ img3_file_t* img3_load(uint8_t* data, size_t size) {
 			break;
 
 		case kDataElement:
-			element = img3_parse_element(&data[data_offset]);
+			element = img3_element_load(&data[data_offset]);
 			if (element == NULL) {
 				error("ERROR: Unable to parse DATA element\n");
 				img3_free(image);
@@ -97,7 +102,7 @@ img3_file_t* img3_load(uint8_t* data, size_t size) {
 			break;
 
 		case kVersElement:
-			element = img3_parse_element(&data[data_offset]);
+			element = img3_element_load(&data[data_offset]);
 			if (element == NULL) {
 				error("ERROR: Unable to parse VERS element\n");
 				img3_free(image);
@@ -108,7 +113,7 @@ img3_file_t* img3_load(uint8_t* data, size_t size) {
 			break;
 
 		case kSepoElement:
-			element = img3_parse_element(&data[data_offset]);
+			element = img3_element_load(&data[data_offset]);
 			if (element == NULL) {
 				error("ERROR: Unable to parse SEPO element\n");
 				img3_free(image);
@@ -119,7 +124,7 @@ img3_file_t* img3_load(uint8_t* data, size_t size) {
 			break;
 
 		case kBordElement:
-			element = img3_parse_element(&data[data_offset]);
+			element = img3_element_load(&data[data_offset]);
 			if (element == NULL) {
 				error("ERROR: Unable to parse BORD element\n");
 				img3_free(image);
@@ -130,7 +135,7 @@ img3_file_t* img3_load(uint8_t* data, size_t size) {
 			break;
 
 		case kChipElement:
-			element = img3_parse_element(&data[data_offset]);
+			element = img3_element_load(&data[data_offset]);
 			if (element == NULL) {
 				error("ERROR: Unable to parse CHIP element\n");
 				img3_free(image);
@@ -141,7 +146,7 @@ img3_file_t* img3_load(uint8_t* data, size_t size) {
 			break;
 
 		case kKbagElement:
-			element = img3_parse_element(&data[data_offset]);
+			element = img3_element_load(&data[data_offset]);
 			if (element == NULL) {
 				error("ERROR: Unable to parse first KBAG element\n");
 				img3_free(image);
@@ -152,7 +157,7 @@ img3_file_t* img3_load(uint8_t* data, size_t size) {
 			break;
 
 		case kEcidElement:
-			element = img3_parse_element(&data[data_offset]);
+			element = img3_element_load(&data[data_offset]);
 			if (element == NULL) {
 				error("ERROR: Unable to parse ECID element\n");
 				img3_free(image);
@@ -164,7 +169,7 @@ img3_file_t* img3_load(uint8_t* data, size_t size) {
 			break;
 
 		case kShshElement:
-			element = img3_parse_element(&data[data_offset]);
+			element = img3_element_load(&data[data_offset]);
 			if (element == NULL) {
 				error("ERROR: Unable to parse SHSH element\n");
 				img3_free(image);
@@ -176,7 +181,7 @@ img3_file_t* img3_load(uint8_t* data, size_t size) {
 			break;
 
 		case kCertElement:
-			element = img3_parse_element(&data[data_offset]);
+			element = img3_element_load(&data[data_offset]);
 			if (element == NULL) {
 				error("ERROR: Unable to parse CERT element\n");
 				img3_free(image);
@@ -188,7 +193,7 @@ img3_file_t* img3_load(uint8_t* data, size_t size) {
 			break;
 
 		case kUnknElement:
-			element = img3_parse_element(&data[data_offset]);
+			element = img3_element_load(&data[data_offset]);
 			if (element == NULL) {
 				error("ERROR: Unable to parse UNKN element\n");
 				img3_free(image);
@@ -234,34 +239,104 @@ img3_element_t* img3_next_element(img3_file_t* image, img3_element_t* element) {
 	}
 	return NULL;
 }
-void hexdump(uint8_t *hex, int size) {
-    int i = 0;
-    for (; i < size; i++)
-        printf("%02x", hex[i]);
-    printf("\n");
-}
-img3_error_t img3_decrypt(img3_file_t* image, uint8_t* iv, uint8_t* key) {
-	AES_KEY aes_key;
-	img3_element_t* data = NULL;
-	img3_element_t* element = NULL;
-	img3_kbag_element_t kbag = NULL;
 
-	uint8_t outbuf[32];
-	memset(outbuf, '\0', sizeof(outbuf));
+void hex2bytes(const char* hex, uint8_t** buf, uint32_t* sz) {
+	int i = 0;
+    unsigned int byte = 0;
+	uint32_t size = strlen(hex) / 2;
 
-	data = img3_get_element(image, kDataElement);
-	element = img3_get_element(image, kKbagElement);
-	if(element && element->size == sizeof(img3_kbag_element_t)) {
-		kbag = (img3_kbag_element_t*) element->data;
-		AES_set_decrypt_key(key, kbag->type, &aes_key);
-		AES_set_encrypt_key(key, kbag->type, &aes_key);
-		AES_cbc_encrypt(data->data, data->data, (data->header->data_size / 16) * 16, &aes_key, iv, AES_DECRYPT);
-		hexdump(data->data, data->size);
+	uint32_t outsz = 0;
+	uint8_t* outbuf = (uint8_t*) malloc(size);
+	memset(outbuf,'\0', sizeof(outbuf));
+
+	for(i = 0; i < size; i++) {
+	    sscanf(hex, "%02x", &byte);
+	    //printf("%x ", byte);
+	    outbuf[i] = byte;
+	    hex += 2;
+	    outsz++;
 	}
+
+	*buf = outbuf;
+	*sz = outsz;
+}
+
+img3_error_t img3_set_key(img3_file_t* image, const char* key, const char* iv) {
+	uint32_t iv_sz = 0;
+	uint32_t key_sz = 0;
+	uint8_t* iv_buf = NULL;
+	uint8_t* key_buf = NULL;
+	img3_element_t* element = NULL;
+	img3_kbag_element_t* kbag = NULL;
+
+	hex2bytes(iv, &iv_buf, &iv_sz);
+	hex2bytes(key, &key_buf, &key_sz);
+	image->iv = iv_buf;
+	image->key = key_buf;
+
+	debug("Fetching KBAG element from image\n");
+	element = img3_get_element(image, kKbagElement);
+	if(element) {
+		debug("Found KBAG element in image\n");
+	} else {
+		debug("Unable to find KBAG element in image\n");
+	}
+
+	kbag = (img3_kbag_element_t*) &element->data[sizeof(img3_element_header_t)];
+	debug("KBAG Type = %d, State = %d\n", kbag->type, kbag->state);
+	image->bits = kbag->type;
+
 	return IMG3_E_SUCCESS;
 }
 
-img3_error_t img3_encrypt(img3_file_t* image, uint8_t* iv, uint8_t* key) {
+
+img3_error_t img3_decrypt(img3_file_t* image) {
+	AES_KEY aes_key;
+	img3_element_t* data = NULL;
+
+	debug("Fetching DATA element from image\n");
+	data = img3_get_element(image, kDataElement);
+	if(data) {
+		debug("Found DATA element in image\n");
+	} else {
+		debug("Unable to find DATA element in image\n");
+	}
+
+	debug("Setting keys to decrypt with\n");
+	AES_set_decrypt_key(image->key, image->bits, &aes_key);
+	//hexdump(&data->data[sizeof(img3_element_header_t)], 0x200);
+
+	image->raw = (uint8_t*) malloc(image->size);
+	if(image->raw) {
+		debug("Performing decryption...\n");
+		AES_cbc_encrypt(&data->data[sizeof(img3_element_header_t)], image->raw, (data->header->data_size * 16) / 16, &aes_key, image->iv, AES_DECRYPT);
+		//hexdump(image->raw, 0x200);
+		image->decrypted = 1;
+	}
+
+	return IMG3_E_SUCCESS;
+}
+
+img3_error_t img3_encrypt(img3_file_t* image) {
+	AES_KEY aes_key;
+	img3_element_t* data = NULL;
+
+	debug("Fetching DATA element from image\n");
+	data = img3_get_element(image, kDataElement);
+	if(data) {
+		debug("Found DATA element in image\n");
+	} else {
+		debug("Unable to find DATA element in image\n");
+	}
+
+	debug("Setting keys to decrypt with\n");
+	AES_set_encrypt_key(image->key, image->bits, &aes_key);
+	hexdump(&data->data[sizeof(img3_element_header_t)], 0x200);
+
+	debug("Performing decryption...\n");
+	AES_cbc_encrypt(&data->data[sizeof(img3_element_header_t)], &data->data[sizeof(img3_element_header_t)], (data->header->data_size * 16) / 16, &aes_key, image->iv, AES_ENCRYPT);
+	hexdump(&data->data[sizeof(img3_element_header_t)], 0x200);
+
 	return IMG3_E_SUCCESS;
 }
 
@@ -291,11 +366,17 @@ void img3_free(img3_file_t* image) {
 	if (image != NULL) {
 		if (image->header != NULL) {
 			free(image->header);
+			image->header = NULL;
+		}
+
+		if(image->raw != NULL) {
+			free(image->raw);
+			image->raw = NULL;
 		}
 
 		int i;
 		for (i = 0; i < image->num_elements; i++) {
-			img3_free_element(image->elements[i]);
+			img3_element_free(image->elements[i]);
 			image->elements[i] = NULL;
 		}
 		free(image);
@@ -317,21 +398,21 @@ void img3_element_free(img3_element_t* element) {
 img3_error_t img3_replace_signature(img3_file_t* image, uint8_t* signature) {
 	int i, oldidx;
 	int offset = 0;
-	img3_element_t* ecid = img3_parse_element(&signature[offset]);
+	img3_element_t* ecid = img3_element_load(&signature[offset]);
 	if (ecid == NULL || ecid->type != kEcidElement) {
 		error("ERROR: Unable to find ECID element in signature\n");
 		return IMG3_E_NOELEMENT;
 	}
 	offset += ecid->header->full_size;
 
-	img3_element_t* shsh = img3_parse_element(&signature[offset]);
+	img3_element_t* shsh = img3_element_load(&signature[offset]);
 	if (shsh == NULL || shsh->type != kShshElement) {
 		error("ERROR: Unable to find SHSH element in signature\n");
 		return IMG3_E_NOELEMENT;
 	}
 	offset += shsh->header->full_size;
 
-	img3_element_t* cert = img3_parse_element(&signature[offset]);
+	img3_element_t* cert = img3_element_load(&signature[offset]);
 	if (cert == NULL || cert->type != kCertElement) {
 		error("ERROR: Unable to find CERT element in signature\n");
 		return IMG3_E_NOELEMENT;
@@ -339,7 +420,7 @@ img3_error_t img3_replace_signature(img3_file_t* image, uint8_t* signature) {
 	offset += cert->header->full_size;
 
 	if (image->idx_ecid_element >= 0) {
-		img3_free_element(image->elements[image->idx_ecid_element]);
+		img3_element_free(image->elements[image->idx_ecid_element]);
 		image->elements[image->idx_ecid_element] = ecid;
 	} else {
 		if (image->idx_shsh_element >= 0) {
@@ -373,7 +454,7 @@ img3_error_t img3_replace_signature(img3_file_t* image, uint8_t* signature) {
 	}
 
 	if (image->idx_shsh_element >= 0) {
-		img3_free_element(image->elements[image->idx_shsh_element]);
+		img3_element_free(image->elements[image->idx_shsh_element]);
 		image->elements[image->idx_shsh_element] = shsh;
 	} else {
 		if (image->idx_cert_element >= 0) {
@@ -406,12 +487,12 @@ img3_error_t img3_replace_signature(img3_file_t* image, uint8_t* signature) {
 		}
 
 		error("%s: ERROR: no SHSH element found to be replaced\n", __func__);
-		img3_free_element(shsh);
+		img3_element_free(shsh);
 		return IMG3_E_NOELEMENT;
 	}
 
 	if (image->idx_cert_element >= 0) {
-		img3_free_element(image->elements[image->idx_cert_element]);
+		img3_element_free(image->elements[image->idx_cert_element]);
 		image->elements[image->idx_cert_element] = cert;
 	} else {
 		// append if not found

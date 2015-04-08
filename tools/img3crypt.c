@@ -24,7 +24,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#define _DEBUG
+
 #include <libimg3-1.0/libimg3.h>
+#include <libcrippy-1.0/libcrippy.h>
 
 #define IMG3_MODE_DECRYPT 1
 #define IMG3_MODE_ENCRYPT 2
@@ -50,13 +53,35 @@ void print_usage() {
 	exit(1);
 }
 
+void hexToBytes(const char* hex, uint8_t** buffer, size_t* bytes) {
+	*bytes = strlen(hex) / 2;
+	*buffer = (uint8_t*) malloc(*bytes);
+	size_t i;
+	for(i = 0; i < *bytes; i++) {
+		uint32_t byte;
+		sscanf(hex, "%2x", &byte);
+		(*buffer)[i] = byte;
+		hex += 2;
+	}
+}
+
+void hexToInts(const char* hex, unsigned int** buffer, size_t* bytes) {
+	*bytes = strlen(hex) / 2;
+	*buffer = (unsigned int*) malloc((*bytes) * sizeof(int));
+	size_t i;
+	for(i = 0; i < *bytes; i++) {
+		sscanf(hex, "%2x", &((*buffer)[i]));
+		hex += 2;
+	}
+}
+
 int main(int argc, char* argv[]) {
 	int i = 0;
 	int opt = 0;
 	int mode = 0;
 	int action = 0;
-	char* iv = NULL;
-	char* key = NULL;
+	char* iv_str = NULL;
+	char* key_str = NULL;
 	char* argument = NULL;
 	img3_error_t error = 0;
 
@@ -78,7 +103,7 @@ int main(int argc, char* argv[]) {
 
 		case 'd':
 			if(mode != 0) {
-				error("Unable to use both -d and -e flags at once\n");
+				debug("Unable to use both -d and -e flags at once\n");
 				return -1;
 			}
 			mode = IMG3_MODE_DECRYPT;
@@ -87,7 +112,7 @@ int main(int argc, char* argv[]) {
 
 		case 'e':
 			if(mode != 0) {
-				error("Unable to use both -d and -e flags at once\n");
+				debug("Unable to use both -d and -e flags at once\n");
 				return -1;
 			}
 			mode = IMG3_MODE_ENCRYPT;
@@ -103,11 +128,11 @@ int main(int argc, char* argv[]) {
 			break;
 
 		case 'i':
-			iv = optarg;
+			iv_str = optarg;
 			break;
 
 		case 'k':
-			key = optarg;
+			key_str = optarg;
 			break;
 
 		default:
@@ -121,11 +146,31 @@ int main(int argc, char* argv[]) {
 		error("Please specify encrypt or decrypt\n");
 		return -1;
 	}
+
 	debug("Opening Img3 file %s\n", img3_input);
 	img3_file_t* image = img3_open(img3_input);
 	if(image) {
+		debug("File opened successfully\n");
+		if(mode == IMG3_MODE_DECRYPT) {
+			debug("Setting Img3 Key and IV\n");
+			img3_set_key(image, key_str, iv_str);
+			debug("Decrypting Img3 file\n");
+			img3_decrypt(image);
+			// No template requested, so just dump binary
+			if(img3_output) {
+				debug("Found output file listed as %s\n", img3_output);
+				if(image->decrypted) {
+					debug("Image claims it's decrypted, dump raw data\n");
+					file_write(img3_output, image->raw, image->size);
+				}
+			}
+		} else if(mode == IMG3_MODE_ENCRYPT) {
+			debug("Encrypting Img3 file\n");
+			img3_set_key(image, key_str, iv_str);
+			img3_encrypt(image);
+		}
 
-		debug("Closing Img3 file\n")
+		debug("Closing Img3 file\n");
 		img3_free(image);
 	}
 
