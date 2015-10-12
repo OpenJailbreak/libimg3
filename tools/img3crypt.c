@@ -161,6 +161,7 @@ int main(int argc, char* argv[]) {
 				debug("Found output file listed as %s\n", img3_output);
 				if(image->decrypted) {
 					debug("Image claims it's decrypted, dump raw data\n");
+					if(image->raw)
 					file_write(img3_output, image->raw, image->size);
 				}
 			}

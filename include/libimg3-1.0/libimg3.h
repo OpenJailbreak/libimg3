@@ -119,6 +119,8 @@ img3_error_t img3_replace_signature(img3_file_t* image, uint8_t* signature);
 img3_error_t img3_serialize(img3_file_t* image, uint8_t** pdata, size_t* psize);
 img3_error_t img3_save(img3_file_t image, const char* path);
 
+img3_error_t img3_decompress(img3_file_t* image);
+
 
 #ifdef __cplusplus
 }

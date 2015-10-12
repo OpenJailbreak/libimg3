@@ -28,8 +28,10 @@
 
 #define _DEBUG
 
-#include <libimg3-1.0/libimg3.h>
+#include "lzss.h"
+#include "libimg3.h"
 #include <libcrippy-1.0/libcrippy.h>
+#include <libcrippy-1.0/endianness.h>
 
 
 img3_file_t* img3_open(const char* path) {
@@ -312,6 +314,12 @@ img3_error_t img3_decrypt(img3_file_t* image) {
 		AES_cbc_encrypt(&data->data[sizeof(img3_element_header_t)], image->raw, (data->header->data_size * 16) / 16, &aes_key, image->iv, AES_DECRYPT);
 		//hexdump(image->raw, 0x200);
 		image->decrypted = 1;
+		uint32_t magic = *((uint32_t*) image->raw);
+		debug("magic = 0x%x\n", magic);
+		if(magic == 0x706d6f63) {//COMP_SIGNATURE) { // comp
+			debug("Image compressed, decompressing\n");
+			img3_decompress(image);
+		}
 	}
 
 	return IMG3_E_SUCCESS;
@@ -553,5 +561,24 @@ img3_error_t img3_serialize(img3_file_t* image, uint8_t** pdata, size_t* psize) 
 
 
 img3_error_t img3_save(img3_file_t image, const char* path) {
+	return IMG3_E_SUCCESS;
+}
+
+img3_error_t img3_decompress(img3_file_t* image) {
+	uint8_t* buffer = NULL;
+	comp_header_t* comp = (comp_header_t*) image->raw;
+	debug("signature = 0x%x\n", comp->signature);
+	debug("compression_type = 0x%x\n", comp->compression_type);
+	if(comp->compression_type == 0x73737a6c) {
+		debug("Found LZSS compression type\n");
+		buffer = (uint8_t*) malloc(__bswap_32(comp->length_uncompressed));
+		//hexdump(&comp->data, 0x200);
+		int size = lzss_decompress(buffer, &comp->data, __bswap_32(comp->length_compressed));
+		//debug("size uncompressed = 0x%x\n", size);
+		//hexdump(buffer, 0x200);
+		free(image->raw);
+		image->raw = buffer;
+		image->size = size;
+	}
 	return IMG3_E_SUCCESS;
 }
